@@ -1,0 +1,135 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r, message=FALSE}
+library(Quandl)
+library(dplyr)
+library(DT)
+library(tseries)
+library(xts)
+library(lubridate)
+```
+
+Where we're going: 
+1) switching from stocks to commodities, one of my true loves as a student of political economy. 
+2) using Quandl: just the beginning as we'll build an add-in later. 
+3) running a model or three and updating it via quandl. arima and 1 other. The point here is a workflow so we can grab a snapshot of our core commodities and quickly compare models. of course, these are simple and non-tested models. In reality, you would have proprietary models and competing hypotheses around the usefulness of those models. 
+4) We will complicate this later by looking at gold and copper and of course we'll wrap this up into a Shiny app choose different commodities, pull down their time series and run a simple model on them. Maybe we'll even let them choose amongst different models! 
+
+```{r}
+oil_daily <- Quandl("FRED/DCOILWTICO", type = "xts", collapse = "daily",  
+                    start_date="2006-01-01", end_date="2017-02-28")
+oil_weekly <- Quandl("FRED/DCOILWTICO", type = "xts", collapse = "weekly",  
+                     start_date="2006-01-01", end_date="2017-02-28")
+oil_monthly <- Quandl("FRED/DCOILWTICO", type = "xts", collapse = "monthly",  
+                      start_date="2006-01-01", end_date="2017-02-28")
+
+# Have a quick look at our three xts objects. 
+head(oil_daily)
+head(oil_weekly)
+head(oil_monthly)
+```
+
+
+Each of those would work well for the rest of this project but let's stick with the monthly data. It's a nice period of time, but the data index isn't in a great format. 
+
+```{r}
+tail(index(oil_monthly), n = 10)
+```
+
+Let's use lubridate to make it a bit prettier, and ultimately easier handle.
+
+```{r}
+index(oil_monthly) <- seq(mdy('01/01/2006'), mdy('02/01/2017'), by = 'months')
+head(index(oil_monthly))
+```
+
+Now we have a cleaner date format. Our base data object is in good shape.
+
+As always, we like to have a look at the data in graphical format so let's fire up dygraphs. 
+
+```{r}
+dygraph(oil_monthly, main = "Monthly oil Prices")
+```
+
+Alright, nothing too shocking here. We see a peek in mid-2008, followed by a precipitous decline through the beginning of 2009.  
+
+Now we'll make things a bit more interesting and try to extract some meaning from that data. Let's use the forecast() function to predict what oil prices will look like over the next 6 months. This is the part of the code where you might want to insert whatever model you have built or wish to test. For our purposes, we will simply pass in the monthly oil prices object and supply a lookahead parameter of 6 and let forecast() do the rest.
+
+```{r, warning=FALSE, message=FALSE}
+oil_weekly_6month <- forecast(oil_monthly, h = 6)
+
+# Let's have a quick look at the 6 month forecast. 
+oil_weekly_6month
+
+```
+
+The mean forecast is right around $55 dollars. We have 4 other readouts as well - the 80% and 95% prediction intervals, both high and low. It looks like the 95% confidence level has a high of 81 in August and a low of 31 in March. We won't dwell on these numbers because, again, whether you're a practitioner or a student, I imagine you will want to use your own model here. This Notebook is more of a skeleton where those models can be inserted and then tested or evaluated at a later date. 
+
+
+```{r}
+plot(oil_weekly_6month, main = "Oil Forecast")
+```
+
+That plot looks ok, but it's not great. We can see that the mean forecast is to stay around $50, with the 95% bands stretching all the way to around 80 and 30, but honestly I have to squint to really see those 95% intervals. We don't like squinting so let's put in some extra work to make use of dygraphs, which will have the benefit of allowing a reader to zoom on the predicted portion of the graph. 
+
+
+```{r}
+oil_data <- data.frame(date = seq(mdy('01/01/2006'), mdy('02/01/2017'), by = 'months'),
+                       oil = oil_monthly)
+
+oil_xts <- xts(oil_data[,-1], order.by = oil_data[,1])
+
+oil_forecast_data <- data.frame(date = seq(mdy('03/01/2017'), mdy('08/01/2017'), by = 'months'),
+                       Forecast = oil_weekly_6month$mean,
+                       Upper_95 = oil_weekly_6month$upper[,2], 
+                       Lower_95 = oil_weekly_6month$lower[,2])
+
+oil_forecast_xts <- xts(oil_forecast_data[,-1], order.by = oil_forecast_data[,1])
+
+# Now we can combine the xts objects with cbind.
+
+oil_combined_xts <- cbind(oil_xts, oil_forecast_xts)
+
+# Let's add a nicer name for the first column
+
+colnames(oil_combined_xts)[1] <- "Actual"
+```
+
+```{r}
+
+dygraph(oil_combined_xts, main = "Oil Prices: Historical and Forecast") %>%
+  dySeries("Actual", label = "Actual") %>%
+  dySeries(c("Lower_95", "Forecast", "Upper_95"))
+```
+
+
+The forecast for next month is `r round(as.numeric(oil_weekly_6month$mean)[1],2)` dollars.
+
+Let's repeat for Copper and Gold. Why? For one thing, it's interesting to see the different data sources available on Quandl. For copper, we will use Chicago Mercantile Exchange pricing. For gold, why not the Bundesbank? As we explore these different data source, it's easy to get lost exploring  some interesting nuggets. For example, Quandl has price history data for gold Kruggerandts and something called Austria Philharmonic gold coins.
+
+```{r, warning=FALSE, message=FALSE}
+plot(forecast(m,7), main="")
+library(dygraphs)
+dygraph(f[upper])
+dygraph(f[['mean']]) %>% dyRangeSelector()
+forecast(m,7)
+```
+```
+
+
+```{r}
+test <- tsbootstrap(copper$Settle, nb = 100, statistic = mean)
+test
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
