@@ -1,0 +1,66 @@
+---
+title: "Advanced Quandl Commodities Flexdb"
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard:
+    #vertical_layout: scroll
+    #orientation: rows
+    source_code: embed
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Inputs{.sidebar}
+--------------------------------
+
+```{r}
+ selectInput("dataSource",
+              "Source",
+             choices = c("FRED", #fred data from federal reserve
+                         "WORLDBANK", # world bank
+                         "FMAC", #freddie mac
+                         "BIS",  #bank of intl settlements
+                         "ODA",  #IMF
+                         "ISM"), #Inst of supply management
+             selected = "FRED"),
+                     
+selectInput("frequency",
+            "freq",
+            choices = c("daily",
+                        "weekly",
+                        "monthly"),
+            selected = "monthly"),
+                     
+textInput("dataSet", "Data Set", " "),
+
+dateRangeInput("dateRange",
+               "Date range",
+               start = "1980-01-01",
+               end   = Sys.Date())
+
+dataSource <- toupper(gsub(" ", "", input$dataSource, fixed = TRUE))
+dataSet <- toupper(gsub(" ", "", input$dataSet, fixed = TRUE))
+
+      ##if you think you'll use this more than 50 times per day, you'll need an api key
+      ##Quandl.api_key(as.character(input$api_key))
+      
+inst <- paste(dataSource, dataSet, sep="/")
+      
+data <- Quandl(inst,
+               start_date = format(input$dateRange[1]),
+               end_date = format(input$dateRange[2]),
+               order = "asc",
+               type = "xts",
+               collapse = as.character(input$frequency)
+              )
+```
+
+Column
+-------------------------------------
+    
+### Chart 1
+    
+```{r}
+```
