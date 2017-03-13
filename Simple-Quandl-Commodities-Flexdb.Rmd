@@ -9,7 +9,12 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(Quandl)
+library(dplyr)
+library(xts)
+library(lubridate)
+library(forecast)
+library(dygraphs)
 ```
 
 Inputs{.sidebar}
@@ -18,43 +23,44 @@ Inputs{.sidebar}
 ```{r}
  selectInput("dataSet",
               "Commodity",
-             choices = c("FRED", #fred data from federal reserve
-                         "WORLDBANK", # world bank
-                         "FMAC", #freddie mac
-                         "BIS",  #bank of intl settlements
-                         "ODA",  #IMF
-                         "ISM"), #Inst of supply management
-             selected = "FRED"),
+             choices = c("WTI oil" = "FRED/DCOILWTICO", #fred data from federal reserve
+                         "Copper" = "ODA/PCOPP_USD", # world bank
+                         "Gold" = "BUNDESBANK/BBK01_WT5511"), #freddie mac
+                         #"BIS",  #bank of intl settlements
+                         #"ODA",  #IMF
+                         #"ISM"), #Inst of supply management
+             selected = "WTI oil")
                      
 selectInput("frequency",
             "freq",
             choices = c("daily",
                         "weekly",
                         "monthly"),
-            selected = "monthly"),
+            selected = "monthly")
                      
-textInput("dataSet", "Data Set", " "),
+#textInput("dataSet", "Data Set", " "),
 
 dateRangeInput("dateRange",
                "Date range",
                start = "1980-01-01",
-               end   = Sys.Date())
+               end   = "2016-12-31")
 
-dataSource <- toupper(gsub(" ", "", input$dataSource, fixed = TRUE))
-dataSet <- toupper(gsub(" ", "", input$dataSet, fixed = TRUE))
-
+#dataSource <- toupper(gsub(" ", "", input$dataSource, fixed = TRUE))
+commodity <- reactive({
+  dataSet <- toupper(gsub(" ", "", input$dataSet, fixed = TRUE))
       ##if you think you'll use this more than 50 times per day, you'll need an api key
       ##Quandl.api_key(as.character(input$api_key))
       
-inst <- paste(dataSource, dataSet, sep="/")
+#inst <- paste(dataSource, dataSet, sep="/")
       
-data <- Quandl(inst,
+commodity <- Quandl(dataSet,
                start_date = format(input$dateRange[1]),
                end_date = format(input$dateRange[2]),
                order = "asc",
                type = "xts",
                collapse = as.character(input$frequency)
               )
+})
 ```
 
 Column
@@ -63,4 +69,12 @@ Column
 ### Chart 1
     
 ```{r}
+dygraphOutput("commodity")
+
+output$commodity <- renderDygraph({
+  dygraph(commodity(), main = paste("Price history of", input$dataSet, sep = " ")) %>%
+    dyAxis("y", label = "$") %>%
+    dyOptions(axisLineWidth = 1.5, fillGraph = TRUE, drawGrid = TRUE)
+})
+
 ```
