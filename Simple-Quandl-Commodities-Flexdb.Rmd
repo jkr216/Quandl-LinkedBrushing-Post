@@ -24,23 +24,32 @@ Inputs{.sidebar}
 # Notice a tradeoff here: we're making it easy on our users because they don't need to 
 # remember the naming conventions. But, we're also forced to severely limit their choices. 
 # On page two, we'll see what it looks like to be more flexible but less efficient.
+
+dataChoices <- c("WTI oil" = "FRED/DCOILWTICO", #fred data from federal reserve
+                "Copper" = "ODA/PCOPP_USD", # world bank
+                "Gold" = "BUNDESBANK/BBK01_WT5511")
+
  selectInput("dataSet",
               "Commodity",
-             choices = c("WTI oil" = "FRED/DCOILWTICO", #fred data from federal reserve
-                         "Copper" = "ODA/PCOPP_USD", # world bank
-                         "Gold" = "BUNDESBANK/BBK01_WT5511"), #freddie mac
+             choices = dataChoices, #freddie mac
                          #"BIS",  #bank of intl settlements
                          #"ODA",  #IMF
                          #"ISM"), #Inst of supply management
              selected = "WTI oil")
+ 
+frequencyChoices <- c("days" = "daily",
+                      "weeks" = "weekly", 
+                      "months" = "monthly")
                      
 selectInput("frequency",
             "freq",
-            choices = c("daily",
-                        "weekly",
-                        "monthly"),
-            selected = "monthly")
+            choices = frequencyChoices, 
+            selected = "months")
                      
+#selectInput("country", "Select country", list(
+#  "Europe" = c("Germany", "Spain"),
+#  "North America" = c("Canada", "United States" = "USA")
+#))
 
 dateRangeInput("dateRange",
                "Date range",
@@ -69,7 +78,9 @@ commodity <- Quandl(dataSet,
 combined_xts <- reactive({
   forecasted <- forecast(commodity(), h = input$periods)
   forecast_dataframe <- data.frame(date = seq(input$dateRange[2], 
-                                           by = 'months', length.out = input$periods),
+                                          #days or weeks    
+                                           by = names(frequencyChoices[frequencyChoices == input$frequency]), 
+                                          length.out = input$periods),
                                 Forecast = forecasted$mean,
                                 Hi_95 = forecasted$upper[,2],
                                 Lo_95 = forecasted$lower[,2])
@@ -83,6 +94,7 @@ combined_xts <- reactive({
 })
 ```
 
+
 Row
 -------------------------------------
     
@@ -92,7 +104,9 @@ Row
 dygraphOutput("commodity")
 
 output$commodity <- renderDygraph({
-  dygraph(commodity(), main = paste("Price history of", input$dataSet, sep = " ")) %>%
+  dygraph(commodity(), 
+          main = paste("Price history of", names(dataChoices[dataChoices==input$dataSet]), 
+                       sep = " ")) %>%
     dyAxis("y", label = "$") %>%
     dyOptions(axisLineWidth = 1.5, fillGraph = TRUE, drawGrid = TRUE)
 })
@@ -110,7 +124,8 @@ dygraphOutput("forecasted")
 
 output$forecasted <- renderDygraph({
 dygraph(combined_xts(), 
-        main = paste(input$dataSet, ": Historical and Forecast", sep = "")) %>%
+        main = paste(names(dataChoices[dataChoices==input$dataSet]), 
+                     ": Historical and Forecast", sep = "")) %>%
   # Add the actual series
   dySeries("Actual", label = "Actual") %>%
   # Add the three forecasted series
