@@ -25,9 +25,9 @@ Inputs{.sidebar}
 # remember the naming conventions. But, we're also forced to severely limit their choices. 
 # On page two, we'll see what it looks like to be more flexible but less efficient.
 
-dataChoices <- c("WTI oil" = "FRED/DCOILWTICO", #fred data from federal reserve
-                "Copper" = "ODA/PCOPP_USD", # world bank
-                "Gold" = "BUNDESBANK/BBK01_WT5511")
+ dataChoices <- c("WTI oil" = "FRED/DCOILWTICO", #fred data from federal reserve
+                  "Copper" = "ODA/PCOPP_USD", # world bank
+                  "Gold" = "BUNDESBANK/BBK01_WT5511")
 
  selectInput("dataSet",
               "Commodity",
@@ -56,17 +56,11 @@ dateRangeInput("dateRange",
                start = "1980-01-01",
                end   = "2016-12-31")
 
-numericInput("periods", "Months to Forecast", 6, min = 1, max = 12)
+numericInput("periods", "Periods to Forecast", 6, min = 1, max = 100)
 
-#dataSource <- toupper(gsub(" ", "", input$dataSource, fixed = TRUE))
 commodity <- reactive({
-  dataSet <- toupper(gsub(" ", "", input$dataSet, fixed = TRUE))
-      ##if you think you'll use this more than 50 times per day, you'll need an api key
-      ##Quandl.api_key(as.character(input$api_key))
       
-#inst <- paste(dataSource, dataSet, sep="/")
-      
-commodity <- Quandl(dataSet,
+commodity <- Quandl(input$dataSet,
                start_date = format(input$dateRange[1]),
                end_date = format(input$dateRange[2]),
                order = "asc",
@@ -76,20 +70,25 @@ commodity <- Quandl(dataSet,
 })
 
 combined_xts <- reactive({
+  
   forecasted <- forecast(commodity(), h = input$periods)
-  forecast_dataframe <- data.frame(date = seq(input$dateRange[2], 
-                                          #days or weeks    
-                                           by = names(frequencyChoices[frequencyChoices == input$frequency]), 
-                                          length.out = input$periods),
-                                Forecast = forecasted$mean,
-                                Hi_95 = forecasted$upper[,2],
-                                Lo_95 = forecasted$lower[,2])
+  
+  forecast_dataframe <- data.frame(
+                        date = seq(input$dateRange[2], 
+                        by = names(frequencyChoices[frequencyChoices == input$frequency]),
+                        length.out = input$periods),
+                        Forecast = forecasted$mean,
+                        Hi_95 = forecasted$upper[,2],
+                        Lo_95 = forecasted$lower[,2])
+  
   forecast_xts <- xts(forecast_dataframe[,-1], order.by = forecast_dataframe[,1])
+  
   combined_xts <- cbind(commodity(), forecast_xts)
 
-# Add a nicer name for the first column.
+  # Add a nicer name for the first column.
 
   colnames(combined_xts)[1] <- "Actual"
+  
   combined_xts
 })
 ```
