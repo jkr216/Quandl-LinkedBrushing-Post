@@ -4,7 +4,7 @@ runtime: shiny
 output:
   flexdashboard::flex_dashboard:
     #vertical_layout: scroll
-    #orientation: rows
+    orientation: rows
     source_code: embed
 ---
 
@@ -21,6 +21,9 @@ Inputs{.sidebar}
 --------------------------------
 
 ```{r}
+# Notice a tradeoff here: we're making it easy on our users because they don't need to 
+# remember the naming conventions. But, we're also forced to severely limit their choices. 
+# On page two, we'll see what it looks like to be more flexible but less efficient.
  selectInput("dataSet",
               "Commodity",
              choices = c("WTI oil" = "FRED/DCOILWTICO", #fred data from federal reserve
@@ -38,12 +41,13 @@ selectInput("frequency",
                         "monthly"),
             selected = "monthly")
                      
-#textInput("dataSet", "Data Set", " "),
 
 dateRangeInput("dateRange",
                "Date range",
                start = "1980-01-01",
                end   = "2016-12-31")
+
+numericInput("periods", "Months to Forecast", 6, min = 1, max = 12)
 
 #dataSource <- toupper(gsub(" ", "", input$dataSource, fixed = TRUE))
 commodity <- reactive({
@@ -61,9 +65,25 @@ commodity <- Quandl(dataSet,
                collapse = as.character(input$frequency)
               )
 })
+
+combined_xts <- reactive({
+  forecasted <- forecast(commodity(), h = input$periods)
+  forecast_dataframe <- data.frame(date = seq(input$dateRange[2], 
+                                           by = 'months', length.out = input$periods),
+                                Forecast = forecasted$mean,
+                                Hi_95 = forecasted$upper[,2],
+                                Lo_95 = forecasted$lower[,2])
+  forecast_xts <- xts(forecast_dataframe[,-1], order.by = forecast_dataframe[,1])
+  combined_xts <- cbind(commodity(), forecast_xts)
+
+# Add a nicer name for the first column.
+
+  colnames(combined_xts)[1] <- "Actual"
+  combined_xts
+})
 ```
 
-Column
+Row
 -------------------------------------
     
 ### Chart 1
@@ -78,3 +98,23 @@ output$commodity <- renderDygraph({
 })
 
 ```
+
+Row
+-------------------------
+
+### Chart 2
+
+```{r}
+
+dygraphOutput("forecasted")
+
+output$forecasted <- renderDygraph({
+dygraph(combined_xts(), 
+        main = paste(input$dataSet, ": Historical and Forecast", sep = "")) %>%
+  # Add the actual series
+  dySeries("Actual", label = "Actual") %>%
+  # Add the three forecasted series
+  dySeries(c("Lo_95", "Forecast", "Hi_95"))
+})
+```
+

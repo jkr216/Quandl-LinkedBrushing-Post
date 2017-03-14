@@ -24,16 +24,16 @@ Inputs{.sidebar}
                          "BIS",  #bank of intl settlements
                          "ODA",  #IMF
                          "ISM"), #Inst of supply management
-             selected = "FRED"),
+             selected = "FRED")
                      
 selectInput("frequency",
             "freq",
             choices = c("daily",
                         "weekly",
                         "monthly"),
-            selected = "monthly"),
+            selected = "monthly")
                      
-textInput("dataSet", "Data Set", " "),
+textInput("dataSet", "Data Set", " ")
 
 dateRangeInput("dateRange",
                "Date range",
