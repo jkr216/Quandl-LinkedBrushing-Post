@@ -90,7 +90,7 @@ First, let's move the mean forecast and 95% confidence bands to a dataframe, alo
 
 
 ```{r}
-oil_forecast_data <- data.frame(date = seq(mdy('03/01/2017'), mdy('08/01/2017'), 
+oil_forecast_data <- data_frame(date = seq(mdy('03/01/2017'), mdy('08/01/2017'), 
                                            by = 'months'),
                                 Forecast = oil_6month$mean,
                                 Hi_95 = oil_6month$upper[,2],

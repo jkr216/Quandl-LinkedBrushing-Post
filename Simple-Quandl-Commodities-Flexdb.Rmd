@@ -3,18 +3,18 @@ title: "Simple Quandl Commodities Flexdb"
 runtime: shiny
 output:
   flexdashboard::flex_dashboard:
-    #vertical_layout: scroll
     orientation: rows
     source_code: embed
 ---
 
 ```{r setup, include=FALSE}
+library(tidyverse) 
 library(Quandl)
-library(dplyr)
-library(xts)
-library(lubridate)
+library(tidyquant)
+library(timetk)
 library(forecast)
 library(dygraphs)
+Quandl.api_key("d9EidiiDWoFESfdk5nPy")
 ```
 
 Inputs{.sidebar}
@@ -25,9 +25,10 @@ Inputs{.sidebar}
 # remember the naming conventions. But, we're also forced to severely limit their choices. 
 # On page two, we'll see what it looks like to be more flexible but less efficient.
 
- dataChoices <- c("WTI oil" = "FRED/DCOILWTICO", #fred data from federal reserve
-                  "Copper" = "ODA/PCOPP_USD", # world bank
-                  "Gold" = "BUNDESBANK/BBK01_WT5511")
+ dataChoices <- c("WTI oil" = "FRED/DCOILWTICO", #oil data from Fred
+                  "Copper" = "ODA/PCOPP_USD", # copper data from ODA
+                  "Gold" = "CHRIS/CME_GC1",
+                  "Gas" = "FRED/GASREGCOVW") # gold data from CME
 
  selectInput("dataSet",
               "Commodity",
@@ -59,7 +60,6 @@ dateRangeInput("dateRange",
 numericInput("periods", "Periods to Forecast", 6, min = 1, max = 100)
 
 commodity <- reactive({
-      
 commodity <- Quandl(input$dataSet,
                start_date = format(input$dateRange[1]),
                end_date = format(input$dateRange[2]),
@@ -122,13 +122,20 @@ Row
 dygraphOutput("forecasted")
 
 output$forecasted <- renderDygraph({
+
+start_date <- tail(seq(input$dateRange[2], by = "-1 months", length = 6), 1)
+
+end_date <- tail(seq(input$dateRange[2], by = names(frequencyChoices[frequencyChoices == input$frequency]), length = input$periods), 1)
+
 dygraph(combined_xts(), 
         main = paste(names(dataChoices[dataChoices==input$dataSet]), 
                      ": Historical and Forecast", sep = "")) %>%
   # Add the actual series
   dySeries("Actual", label = "Actual") %>%
   # Add the three forecasted series
-  dySeries(c("Lo_95", "Forecast", "Hi_95"))
+  dySeries(c("Lo_95", "Forecast", "Hi_95")) %>% 
+  #a range selector to focus on the forecasted
+  dyRangeSelector(dateWindow = c(start_date, end_date))
 })
 ```
 

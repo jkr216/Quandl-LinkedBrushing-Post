@@ -1,0 +1,134 @@
+---
+title: 'Quandl and Forecasting'
+output:
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+# packages required for this post
+
+library(Quandl)
+library(tidyverse)
+library(tidyquant)
+library(timetk)
+library(forecast)
+library(highcharter)
+
+Quandl.api_key("d9EidiiDWoFESfdk5nPy")
+```
+
+Welcome to another installment of [Reproducible Finance with R](https://rviews.rstudio.com/categories/reproducible-finance-with-r/). Today we are going to shift focus in recognition of the fact that there's more to finance than stock prices, and there's more to data download than quantmod/getSymbols. In this post, we will explore oil prices using data from [Quandl](https://www.quandl.com/), a repository for both free and paid data sources. We will also get into the forecasting game a bit and think about how best to use dygraphs when visualizing predicted time series as an extension of historical data.  We are not going to do anything too complex, but we will expand our toolkit by getting familiar with Quandl, commodity prices, the `forecast` package, and `highcharter`. Our ultimate goal is to build a tool where an end user can explore and forecast commodities prices via a Shiny app. The final app can be viewed [here](http://www.reproduciblefinance.com/shiny/quandl-commodities/). 
+
+Before we dive in, a few thoughts to frame this post.      
+
+*   We are using oil data from Quandl, but the original data is from [FRED](https://fred.stlouisfed.org/).  There's nothing wrong with grabbing the data directly from FRED, of course, and I browse FRED frequently to check out economic data, but I tend to download the data into my RStudio environment using Quandl.  I wanted to introduce Quandl today because it's a nice resource and it's gaining in popularity. If you work in the financial industry, you might start to encounter it in your work. 
+
+*   This post marks our first foray into the world of predictive modeling, albeit in a very simple way. But the complexity and accuracy of the forecasting methodology we use here is almost irrelevant since I expect that most R coders, whether in industry or otherwise, will have their own proprietary models. Rather, what I want to accomplish here is a framework where models can be inserted, visualized, and scrutinized in the future.  I harp on reproducible workflows a lot, and that's not going to change today because one goal of this Notebook is to house a forecast that can be reproduced in the future (at which point, we will know if the forecast was accurate or not), and then tweaked/criticized/updated/heralded. 
+
+Let's get to the data download! In the chunk below, as we import WTI oil prices, notice that Quandl makes it easy to choose types of objects (raw/dataframe, xts, or zoo), periods (daily, weekly, or monthly) and start/end dates.   
+
+```{r, message=FALSE, warning=FALSE}
+library(Quandl)
+library(tidyverse)
+library(tidyquant)
+library(timetk)
+library(forecast)
+library(highcharter)
+# You might want to supply an API key. It's free to sign up.
+# Quandl.api_key("your API key here")
+
+# Start with daily data. Note that "type = raw" will download a data frame.
+oil_daily <- Quandl("FRED/DCOILWTICO", 
+                    type = "raw", 
+                    collapse = "daily",  
+                    start_date = "2008-01-01", 
+                    end_date = "2018-01-01")
+
+# Now weekly and let's use xts as the type.
+oil_weekly <- Quandl("FRED/DCOILWTICO", 
+                     type = "xts", 
+                     collapse = "weekly",  
+                    start_date = "2008-01-01", 
+                    end_date = "2018-01-01")
+
+# And monthly using xts as the type.
+oil_monthly <- Quandl("FRED/DCOILWTICO", 
+                      type = "xts", 
+                      collapse = "monthly",  
+                    start_date = "2008-01-01", 
+                    end_date = today())
+
+# Have a quick look at our three  objects. 
+head(oil_daily)
+head(oil_weekly)
+head(oil_monthly)
+```
+
+
+
+Each of the oil data objects we created would work well for the rest of this project, but let's stick with the monthly data.  I don't love the formate of the column so let's use the `seq()` function and `mdy()` from the `lubridate` package to put the date into a nicer format.
+
+```{r}
+index(oil_monthly) <- seq(mdy('01/01/2008'), mdy(last(index(oil_monthly))), by = 'months')
+
+head(index(oil_monthly))
+```
+
+Now we have a cleaner date format and  our price data object is in good shape. Let's fire up `highcharter` and visualize our price history. Since we imported an xts object directly from Quandl, we can plug it straight into the `hchart()` function.
+
+```{r}
+hchart(oil_monthly)
+```
+
+Or we can use the `highchart(type = "stock")` code flow to produce the same chart. Let's also add a `$` label to the y-axis with `hc_yAxis`. 
+
+```{r}
+highchart(type = "stock") %>% 
+  hc_add_series(oil_monthly, color = "cornflowerblue") %>% 
+  hc_yAxis(title = list(text = "monthly price"),
+           labels = list(format = "${value}"),
+           opposite = FALSE) %>% 
+  hc_add_theme(hc_theme_flat())
+```
+
+Nothing too shocking here. We see a peak in mid-2008, followed by a precipitous decline through the beginning of 2009.
+
+Now we'll make things a bit more interesting and try to extract some meaning from that data. First, let's fit an arima model to our time series using the `auto.arima()` function from the `forecast` package. This is for illustrative purposes only and probably isn't the best model for oil prices.
+
+```{r}
+auto.arima(oil_monthly)
+```
+
+Next we can use the `forecast()` function to predict what oil prices will look like over the next six months, based on the arima model we just fit. 
+
+```{r}
+auto.arima(oil_monthly) %>% 
+  forecast(h = 6)
+```
+
+The point forecast is around \$62. It looks like the 95% confidence interval 6 months out has a high of \$16 and a low of \$107. We won't dwell on these numbers because I imagine you will want to use your own model here - this code flow is more of a skeleton where other models can be inserted and then tested or evaluated at a later date.
+
+Let's move on to visualizing the results of the forecast along with the historical data. A great feature of `highcharter` is that it accepts the results of `forecast` directly. We can pipe the model and forecast results directly to `hchart()`.
+
+```{r}
+oil_monthly_ts <- 
+  oil_monthly%>% 
+  tk_ts(start = c(2008), freq = 12)
+auto.arima(oil_monthly_ts) %>% 
+  forecast(h = 6) %>% 
+  hchart() %>% 
+  hc_title(text = "Oil historical and forecast") %>% 
+  hc_yAxis(title = list(text = "monthly price"),
+           labels = list(format = "${value}"),
+           opposite = FALSE) %>% 
+  hc_xAxis(type = "datetime", dateTimeLabelFormats = list(day = '%d of %b')) %>% 
+  hc_add_theme(hc_theme_flat()) %>% 
+  hc_navigator(enabled = TRUE)
+```
+
+
+That's all for today. We have gotten some familiarity with Quandl, used `forecast()` to predict the next six months of oil prices, and seen how smooth it is to pass forecasts to `highcharter`. Next time, we will wrap this into a Shiny app so that users can choose their own parameters, and choose different commodities. See you then!
+
+Note: this post was updated on August 2, 2018.
